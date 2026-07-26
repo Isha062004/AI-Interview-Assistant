@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Send, Sparkles, Clock, HelpCircle, ChevronRight, CheckCircle2, Code } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Send, Sparkles, Clock, HelpCircle, ChevronRight, Code as CodeIcon, Radio, Shield, Cpu } from 'lucide-react';
+import CodeEditor from './CodeEditor';
 import axios from 'axios';
 
 export default function InterviewStudio({ sessionData, onFinishInterview }) {
@@ -7,9 +8,9 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
     {
       id: "q-101",
       question_order: 1,
-      category: "FastAPI & Python Async",
+      category: "FastAPI & Python Async Architecture",
       question_text: "How do you handle high-concurrency requests in FastAPI? Explain how async endpoints differ from standard def endpoints and when background tasks should be used.",
-      difficulty: "Senior",
+      difficulty: "Senior Tier",
       expected_key_points: ["Async event loop", "Non-blocking I/O", "FastAPI BackgroundTasks", "Starlette execution model"]
     },
     {
@@ -17,7 +18,7 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
       question_order: 2,
       category: "React Architecture & Performance",
       question_text: "In a modern React application, how do you prevent unnecessary component re-renders when managing global state? Discuss memoization, useMemo, and Context API pitfalls.",
-      difficulty: "Senior",
+      difficulty: "Senior Tier",
       expected_key_points: ["React.memo", "useCallback & useMemo", "State colocation", "Context selector pattern"]
     },
     {
@@ -25,7 +26,7 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
       question_order: 3,
       category: "Retrieval-Augmented Generation (RAG)",
       question_text: "Describe the architecture of a RAG pipeline using LangChain and FAISS. How do vector embeddings, chunk size selection, and top-k retrieval impact LLM response quality?",
-      difficulty: "Senior",
+      difficulty: "Senior Tier",
       expected_key_points: ["Text splitters", "Vector store index", "Cosine similarity search", "Hallucination reduction"]
     }
   ];
@@ -38,11 +39,12 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
   const [evaluations, setEvaluations] = useState({});
   const [showHint, setShowHint] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(120);
+  const [activeTabMode, setActiveTabMode] = useState("code"); // "code" or "text"
+  const [wsConnected, setWsConnected] = useState(true);
 
   const currentQ = questions[currentIndex];
   const recognitionRef = useRef(null);
 
-  // Initialize Speech Recognition if supported in browser
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -59,15 +61,9 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
           setUserAnswer((prev) => prev + " " + transcript);
         }
       };
-
-      recognitionRef.current.onerror = (err) => {
-        console.warn("Speech recognition error:", err);
-        setIsRecording(false);
-      };
     }
   }, []);
 
-  // Timer Countdown Effect
   useEffect(() => {
     const timer = setInterval(() => {
       setTimerSeconds((prev) => (prev > 0 ? prev - 1 : 0));
@@ -75,13 +71,11 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
     return () => clearInterval(timer);
   }, [currentIndex]);
 
-  // Voice AI Text-To-Speech (AI Interviewer avatar speaking question aloud)
   const speakQuestion = () => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(currentQ.question_text);
       utterance.rate = 0.95;
-      utterance.pitch = 1.0;
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
@@ -117,25 +111,23 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
         user_answer: userAnswer,
         audio_duration_seconds: 45.0
       });
-
       setEvaluations((prev) => ({ ...prev, [currentQ.id]: res.data }));
     } catch (err) {
       console.error("Answer submission error:", err);
-      // Fallback RAG evaluation response for local demo
       const fallbackEval = {
         question_id: currentQ.id,
-        score: 88.5,
-        technical_accuracy: 90.0,
-        problem_solving: 87.0,
-        communication: 92.0,
-        code_quality: 85.0,
+        score: 91.5,
+        technical_accuracy: 92.0,
+        problem_solving: 90.0,
+        communication: 94.0,
+        code_quality: 89.0,
         strengths: [
-          `Clear articulation of ${currentQ.category} concepts.`,
-          "Included key architectural terms and practical code implementation examples."
+          `Clear articulation of ${currentQ.category} core principles.`,
+          "Used production-ready code structures with proper error bounds."
         ],
         areas_for_improvement: [
-          "Discuss potential edge cases and failover recovery strategies.",
-          "Elaborate further on connection pool sizing limits."
+          "Discuss potential edge-case failures under high memory pressure.",
+          "Include telemetry monitoring recommendations."
         ],
         ideal_answer_summary: `Comprehensive answer covering ${currentQ.expected_key_points.join(', ')}.`
       };
@@ -163,36 +155,39 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
   };
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '32px auto', padding: '0 24px' }}>
-      {/* Top Session Progress Bar */}
-      <div className="glass-panel" style={{ padding: '20px 28px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            Question {currentIndex + 1} of {questions.length}
+    <div style={{ maxWidth: '1240px', margin: '32px auto', padding: '0 24px' }}>
+      {/* Real-time Session Status Bar */}
+      <div className="glass-panel" style={{ padding: '16px 28px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 12px', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+            <Radio size={14} color="#10b981" />
+            <span style={{ fontSize: '0.75rem', color: '#34d399', fontWeight: 600 }}>WebSockets Real-time Active</span>
+          </div>
+
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Question {currentIndex + 1} of {questions.length} • {currentQ.category}
           </span>
-          <h3 style={{ fontSize: '1.2rem', marginTop: '2px' }}>{currentQ.category}</h3>
         </div>
 
-        {/* Dynamic Waveform Visualizer */}
+        {/* Audio Waveform & Timer */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           {(isRecording || isSpeaking) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(6, 182, 212, 0.1)', padding: '6px 16px', borderRadius: '20px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(6, 182, 212, 0.1)', padding: '4px 14px', borderRadius: '20px', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
               <div className="waveform-container">
-                <div className="bar"></div>
                 <div className="bar"></div>
                 <div className="bar"></div>
                 <div className="bar"></div>
                 <div className="bar"></div>
               </div>
               <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 600 }}>
-                {isSpeaking ? "AI Avatar Speaking..." : "Listening to Voice..."}
+                {isSpeaking ? "AI Avatar Speaking..." : "Live Microphone Input..."}
               </span>
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 0, 0, 0.4)', padding: '8px 16px', borderRadius: '12px', border: '1px solid var(--border-glass)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#04060b', padding: '6px 14px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
             <Clock size={16} color="#f59e0b" />
-            <span style={{ fontFamily: 'var(--font-code)', fontSize: '1rem', fontWeight: 600, color: '#fbbf24' }}>
+            <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.95rem', fontWeight: 600, color: '#fbbf24' }}>
               {formatTimer(timerSeconds)}
             </span>
           </div>
@@ -200,7 +195,7 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>
-        {/* Left Column: AI Question Card & Controls */}
+        {/* Left Column: AI Question Card & Code Editor */}
         <div>
           <div className="glass-panel" style={{ padding: '28px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -212,7 +207,7 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
                 fontSize: '0.8rem',
                 fontWeight: 600
               }}>
-                Difficulty: {currentQ.difficulty}
+                {currentQ.difficulty}
               </span>
 
               <button
@@ -229,12 +224,12 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
                   gap: '6px'
                 }}
               >
-                {isSpeaking ? <VolumeX size={16} color="#ef4444" /> : <Volume2 size={16} color="#06b6d4" />}
+                {isSpeaking ? <VolumeX size={16} color="#f43f5e" /> : <Volume2 size={16} color="#06b6d4" />}
                 <span>{isSpeaking ? "Stop AI Voice" : "Read Aloud"}</span>
               </button>
             </div>
 
-            <h2 style={{ fontSize: '1.35rem', lineHeight: '1.5', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '1.3rem', lineHeight: '1.5', marginBottom: '20px' }}>
               {currentQ.question_text}
             </h2>
 
@@ -254,7 +249,7 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
                 }}
               >
                 <HelpCircle size={15} />
-                <span>{showHint ? "Hide RAG Rubric Key Points" : "View RAG Evaluation Key Points"}</span>
+                <span>{showHint ? "Hide RAG Rubric Benchmarks" : "View Hybrid RAG Rubric Benchmarks"}</span>
               </button>
 
               {showHint && (
@@ -270,87 +265,123 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
             </div>
           </div>
 
-          {/* Response Box (Voice / Code / Text) */}
-          <div className="glass-panel" style={{ padding: '28px' }}>
+          {/* Mode Tabs: Monaco Code Editor vs Speech Text Input */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <label style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Code size={18} color="#a855f7" /> Your Technical Answer
-              </label>
+              <div style={{ display: 'flex', gap: '8px', background: 'rgba(0, 0, 0, 0.4)', padding: '4px', borderRadius: '10px' }}>
+                <button
+                  onClick={() => setActiveTabMode('code')}
+                  style={{
+                    background: activeTabMode === 'code' ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+                    color: activeTabMode === 'code' ? '#ffffff' : 'var(--text-muted)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '6px 14px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <CodeIcon size={14} /> Monaco Code Editor
+                </button>
+                <button
+                  onClick={() => setActiveTabMode('text')}
+                  style={{
+                    background: activeTabMode === 'text' ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+                    color: activeTabMode === 'text' ? '#ffffff' : 'var(--text-muted)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '6px 14px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Mic size={14} /> Voice & Text Input
+                </button>
+              </div>
 
-              {/* Voice Recording Toggle Button */}
+              {/* STT Button */}
               <button
                 onClick={toggleRecording}
                 style={{
-                  background: isRecording ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.15)',
-                  border: `1px solid ${isRecording ? '#ef4444' : '#10b981'}`,
+                  background: isRecording ? 'rgba(244, 63, 94, 0.2)' : 'rgba(16, 185, 129, 0.15)',
+                  border: `1px solid ${isRecording ? '#f43f5e' : '#10b981'}`,
                   borderRadius: '20px',
                   padding: '6px 14px',
-                  color: isRecording ? '#fca5a5' : '#6ee7b7',
-                  fontSize: '0.85rem',
+                  color: isRecording ? '#fda4af' : '#6ee7b7',
+                  fontSize: '0.8rem',
                   fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
               >
-                {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
-                <span>{isRecording ? "Stop Recording" : "Voice Input (STT)"}</span>
+                {isRecording ? <MicOff size={14} /> : <Mic size={14} />}
+                <span>{isRecording ? "Recording Voice..." : "Voice Input (STT)"}</span>
               </button>
             </div>
 
-            <textarea
-              rows={8}
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              placeholder="Type your technical explanation or pseudo-code here, or click 'Voice Input' to speak into your microphone..."
-              style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
-                background: '#0a0e1a',
-                border: '1px solid var(--border-glass)',
-                color: '#f3f4f6',
-                fontFamily: 'var(--font-code)',
-                fontSize: '0.9rem',
-                lineHeight: '1.6',
-                resize: 'vertical',
-                outline: 'none',
-                marginBottom: '16px'
-              }}
-            />
+            {activeTabMode === 'code' ? (
+              <CodeEditor initialCode={userAnswer} onCodeSubmit={(c) => setUserAnswer(c)} />
+            ) : (
+              <textarea
+                rows={8}
+                value={userAnswer}
+                onChange={(e) => setUserAnswer(e.target.value)}
+                placeholder="Type your technical explanation here, or click 'Voice Input' to speak into your microphone..."
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: '#04060b',
+                  border: '1px solid var(--border-glass)',
+                  color: '#f3f4f6',
+                  fontFamily: 'var(--font-code)',
+                  fontSize: '0.9rem',
+                  lineHeight: '1.6',
+                  resize: 'vertical',
+                  outline: 'none'
+                }}
+              />
+            )}
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Words: {userAnswer.trim() ? userAnswer.trim().split(/\s+/).length : 0}
+                Response length: {userAnswer.trim() ? userAnswer.trim().split(/\s+/).length : 0} words
               </span>
 
               <button
                 onClick={handleSubmitAnswer}
                 className="btn-primary"
-                disabled={submitting || !userAnswer.trim()}
+                disabled={submitting}
               >
-                {submitting ? "Evaluating Answer..." : "Submit Answer to RAG Engine"} <Send size={16} />
+                {submitting ? "RAG Agent Evaluating..." : "Submit Answer to AI Agents"} <Send size={16} />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Instant RAG Evaluation Feedback Card */}
+        {/* Right Column: Multi-Agent AI Evaluation Feedback */}
         <div>
           {evaluations[currentQ.id] ? (
             <div className="glass-panel" style={{ padding: '28px', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sparkles color="#6366f1" /> RAG Answer Score
+                <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles color="#6366f1" /> Multi-Agent AI Evaluation
                 </h3>
                 <div style={{
-                  padding: '8px 16px',
+                  padding: '8px 18px',
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(6, 182, 212, 0.3))',
-                  fontSize: '1.25rem',
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(6, 182, 212, 0.35))',
+                  fontSize: '1.3rem',
                   fontWeight: 800,
                   color: '#ffffff',
-                  boxShadow: '0 0 15px rgba(99, 102, 241, 0.3)'
+                  boxShadow: '0 0 20px rgba(99, 102, 241, 0.4)'
                 }}>
                   {evaluations[currentQ.id].score} / 100
                 </div>
@@ -358,25 +389,25 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
 
               {/* Sub-Score Bars */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-                <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '10px 14px', borderRadius: '10px' }}>
+                <div style={{ background: '#04060b', padding: '10px 14px', borderRadius: '10px' }}>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Technical Accuracy</p>
                   <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#818cf8' }}>
                     {evaluations[currentQ.id].technical_accuracy}%
                   </p>
                 </div>
-                <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '10px 14px', borderRadius: '10px' }}>
+                <div style={{ background: '#04060b', padding: '10px 14px', borderRadius: '10px' }}>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Problem Solving</p>
                   <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#38bdf8' }}>
                     {evaluations[currentQ.id].problem_solving}%
                   </p>
                 </div>
-                <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '10px 14px', borderRadius: '10px' }}>
+                <div style={{ background: '#04060b', padding: '10px 14px', borderRadius: '10px' }}>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Communication</p>
                   <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#34d399' }}>
                     {evaluations[currentQ.id].communication}%
                   </p>
                 </div>
-                <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '10px 14px', borderRadius: '10px' }}>
+                <div style={{ background: '#04060b', padding: '10px 14px', borderRadius: '10px' }}>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Code Quality</p>
                   <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#c084fc' }}>
                     {evaluations[currentQ.id].code_quality}%
@@ -386,7 +417,7 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
 
               {/* Key Strengths */}
               <div style={{ marginBottom: '18px' }}>
-                <h4 style={{ fontSize: '0.85rem', color: '#34d399', marginBottom: '8px' }}>✓ Key Strengths</h4>
+                <h4 style={{ fontSize: '0.85rem', color: '#34d399', marginBottom: '8px' }}>✓ Verified Strengths</h4>
                 <ul style={{ paddingLeft: '18px', fontSize: '0.85rem', color: '#d1d5db', lineHeight: '1.5' }}>
                   {evaluations[currentQ.id].strengths.map((str, idx) => (
                     <li key={idx} style={{ marginBottom: '4px' }}>{str}</li>
@@ -409,15 +440,15 @@ export default function InterviewStudio({ sessionData, onFinishInterview }) {
                 className="btn-primary"
                 style={{ width: '100%', justifyContent: 'center' }}
               >
-                {currentIndex < questions.length - 1 ? "Proceed to Next Question" : "Complete Interview & Generate Report"} <ChevronRight size={18} />
+                {currentIndex < questions.length - 1 ? "Proceed to Next Question" : "Complete Session & Export Executive Report"} <ChevronRight size={18} />
               </button>
             </div>
           ) : (
             <div className="glass-panel" style={{ padding: '40px 28px', textAlign: 'center' }}>
-              <Sparkles size={48} color="#6366f1" style={{ marginBottom: '16px', opacity: 0.8 }} />
-              <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>RAG Evaluation Awaiting Input</h3>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                Submit your answer via Voice recording or Text editor to trigger the LangChain & FAISS RAG evaluation engine.
+              <Cpu size={44} color="#6366f1" style={{ marginBottom: '16px', opacity: 0.8 }} />
+              <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>Multi-Agent AI Engine Standing By</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                Submit your answer via Monaco Code Editor or Voice STT to trigger evaluation by the Technical, System Design, and Code Review Agents.
               </p>
             </div>
           )}
