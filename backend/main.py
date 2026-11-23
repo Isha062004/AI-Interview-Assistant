@@ -42,18 +42,35 @@ app.include_router(interview.router, prefix=settings.API_V1_STR)
 app.include_router(evaluation.router, prefix=settings.API_V1_STR)
 app.include_router(roadmap.router, prefix=settings.API_V1_STR)
 
-@app.get("/")
-def root():
-    return {
-        "message": "Welcome to Enterprise AI Interview Platform",
-        "version": settings.VERSION,
-        "docs_v1": f"{settings.API_V1_STR}/docs"
-    }
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 @app.get(f"{settings.API_PREFIX}/health")
 @app.get(f"{settings.API_V1_STR}/health")
 def health_check():
     return {"status": "healthy", "service": settings.PROJECT_NAME, "architecture": "Enterprise Clean Architecture"}
+
+# Serve Frontend Built Dist (Static Files & React SPA fallback)
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+assets_dir = os.path.join(frontend_dist, "assets")
+
+if os.path.exists(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    file_path = os.path.join(frontend_dist, full_path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
+    index_file = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {
+        "message": "Welcome to Enterprise AI Interview Platform",
+        "version": settings.VERSION,
+        "docs_v1": f"{settings.API_V1_STR}/docs"
+    }
 
 if __name__ == "__main__":
     import uvicorn

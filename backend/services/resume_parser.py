@@ -1,8 +1,15 @@
 import re
 import io
 from typing import Dict, Any, List
-import pypdf
-import docx
+try:
+    import pypdf
+except ImportError:
+    pypdf = None
+
+try:
+    import docx
+except ImportError:
+    docx = None
 
 KNOWN_SKILLS = [
     "Python", "FastAPI", "React", "LangChain", "FAISS", "PostgreSQL", "Docker", 
